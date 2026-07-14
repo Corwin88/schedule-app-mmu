@@ -5,6 +5,7 @@
 
 [functions]
   node_bundler = "esbuild"
+  external_node_modules = ["web-push", "@upstash/redis"]
 
 [[redirects]]
   from = "/api/*"
