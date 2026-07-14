@@ -2,25 +2,21 @@
 import { Redis } from '@upstash/redis';
 import webpush from 'web-push';
 
-// Настройка VAPID
 webpush.setVapidDetails(
   'mailto:example@mail.ru',
   process.env.VAPID_PUBLIC_KEY,
   process.env.VAPID_PRIVATE_KEY
 );
 
-// Redis клиент
 const redis = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL,
   token: process.env.UPSTASH_REDIS_REST_TOKEN,
 });
 
-// Auth header для API РУЗ
 const AUTH_HEADER = 'Basic ' + Buffer.from(
   `${process.env.RUIZ_USER}:${process.env.RUIZ_PASS}`
 ).toString('base64');
 
-// Вспомогательная функция для запросов к университету
 async function fetchRemote(url, method = 'GET', body = null) {
   const options = {
     method,
@@ -38,7 +34,6 @@ async function fetchRemote(url, method = 'GET', body = null) {
   catch { return { status: response.status, body: text }; }
 }
 
-// Установка CORS-заголовков
 function corsHeaders() {
   return {
     'Access-Control-Allow-Origin': '*',
@@ -47,18 +42,16 @@ function corsHeaders() {
   };
 }
 
-// Основной обработчик
 export default async function handler(req) {
-  // CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders() });
   }
 
   const url = new URL(req.url);
-  const path = url.pathname.replace('/api', ''); // Netlify перенаправляет /api/* в функцию
+  const path = url.pathname.replace('/api', '');
 
   try {
-    // --- Сохранение подписки ---
+    // --- save-subscription ---
     if (req.method === 'POST' && path === '/save-subscription') {
       const { groupId, subscription } = await req.json();
       if (!groupId || !subscription) {
@@ -66,11 +59,10 @@ export default async function handler(req) {
       }
       const key = `sub:${groupId}:${subscription.endpoint}`;
       await redis.set(key, JSON.stringify(subscription));
-      console.log(`🔔 Подписка сохранена: ${key}`);
       return new Response(JSON.stringify({ success: true }), { headers: corsHeaders() });
     }
 
-    // --- Удаление подписки ---
+    // --- unsubscribe ---
     if (req.method === 'POST' && path === '/unsubscribe') {
       const { groupId, endpoint } = await req.json();
       if (!groupId || !endpoint) {
@@ -78,11 +70,10 @@ export default async function handler(req) {
       }
       const key = `sub:${groupId}:${endpoint}`;
       await redis.del(key);
-      console.log(`🔕 Подписка удалена: ${key}`);
       return new Response(JSON.stringify({ success: true }), { headers: corsHeaders() });
     }
 
-    // --- Статистика подписок ---
+    // --- subscriptions-stats ---
     if (req.method === 'GET' && path === '/subscriptions-stats') {
       const keys = await redis.keys('sub:*');
       const stats = {};
@@ -93,7 +84,7 @@ export default async function handler(req) {
       return new Response(JSON.stringify(stats), { headers: corsHeaders() });
     }
 
-    // --- Отправка уведомления от деканата ---
+    // --- send-notification ---
     if (req.method === 'POST' && path === '/send-notification') {
       const authHeader = req.headers.get('authorization');
       if (!authHeader || authHeader !== `Bearer ${process.env.ADMIN_SECRET}`) {
@@ -144,12 +135,12 @@ export default async function handler(req) {
       return new Response(JSON.stringify({ success: true, sent: success, total: targets.length }), { headers: corsHeaders() });
     }
 
-    // --- Загрузка файла (заглушка) ---
+    // --- upload (stub) ---
     if (req.method === 'POST' && path === '/upload') {
       return new Response(JSON.stringify({ error: 'Загрузка файлов временно недоступна' }), { status: 501, headers: corsHeaders() });
     }
 
-    // --- Прокси к университету (все остальные /api/*) ---
+    // --- proxy all other /api/* ---
     const targetUrl = `https://schedule.mi.university${req.url.replace('/api', '')}`;
     const { status, body } = await fetchRemote(targetUrl, req.method, req.method !== 'GET' ? await req.json() : null);
     return new Response(JSON.stringify(body), { status, headers: corsHeaders() });
