@@ -93,6 +93,9 @@ function saveSubscriptions() {
 // Инициализируем хранилище
 const subscriptions = loadSubscriptions();
 
+// ✅ БАГ #6 ИСПРАВЛЕН: трекер уже отправленных уведомлений (lessonOid → timestamp)
+const sentNotifications = new Map();
+
 // ==================== ПРОКСИ К РУЗ ====================
 app.use('/api', async (req, res, next) => {
   if ([
@@ -243,26 +246,41 @@ async function checkAndNotify(groupId) {
   if (!text) return;
   const data = JSON.parse(text);
   if (!Array.isArray(data) || data.length === 0) return;
-  const latest = data[data.length - 1];
-  const payload = JSON.stringify({
-    title: 'Изменение в расписании',
-    body: `${latest.discipline || 'Пара'} (${latest.date || ''})`,
-    icon: '/icon-192.png',
-    data: { url: '/' }
+
+  // ✅ БАГ #6 ИСПРАВЛЕН: отправляем только новые уведомления
+  const newItems = data.filter(item => {
+    const key = `${groupId}:${item.lessonOid}`;
+    return !sentNotifications.has(key);
   });
+  if (newItems.length === 0) return;
+
   const subs = subscriptions.get(groupId) || [];
-  for (const sub of subs) {
-    try {
-      await webpush.sendNotification(sub, payload);
-    } catch (err) {
-      if (err.statusCode === 410) {
-        const idx = subs.findIndex(s => s.endpoint === sub.endpoint);
-        if (idx !== -1) {
-          subs.splice(idx, 1);
-          saveSubscriptions();
+  for (const item of newItems) {
+    const payload = JSON.stringify({
+      title: 'Изменение в расписании',
+      body: `${item.discipline || 'Пара'} (${item.date || ''})`,
+      icon: '/icon-192.png',
+      data: { url: '/' }
+    });
+    for (const sub of subs) {
+      try {
+        await webpush.sendNotification(sub, payload);
+      } catch (err) {
+        if (err.statusCode === 410) {
+          const idx = subs.findIndex(s => s.endpoint === sub.endpoint);
+          if (idx !== -1) { subs.splice(idx, 1); saveSubscriptions(); }
         }
       }
     }
+    // Помечаем как отправленное
+    const key = `${groupId}:${item.lessonOid}`;
+    sentNotifications.set(key, Date.now());
+  }
+
+  // Чистим старые записи (старше 48ч) чтобы Map не рос бесконечно
+  const cutoff = Date.now() - 48 * 60 * 60 * 1000;
+  for (const [key, ts] of sentNotifications.entries()) {
+    if (ts < cutoff) sentNotifications.delete(key);
   }
 }
 

@@ -1,4 +1,3 @@
-  // Замени ТВОЙ_ПУБЛИЧНЫЙ_КЛЮЧ_БЕЗ_КАВЫЧЕК на реальный публичный VAPID-ключ
 const VAPID_PUBLIC_KEY = 'BBR-hSeTMGfqE0t-62esbrV0TsdHBSL9DBi6nNIEU-ywRHDfLs6XyC_TPN6sMONKjI4bEhbxqXFQ3EB6cWm7tKc';
 
 function urlBase64ToUint8Array(base64String) {
@@ -14,6 +13,11 @@ function urlBase64ToUint8Array(base64String) {
   return outputArray;
 }
 
+// ✅ БАГ #2 и #3 ИСПРАВЛЕНЫ: единый базовый URL без дублирования пути
+function getApiBase() {
+  return import.meta.env.PROD ? '' : 'http://localhost:3000';
+}
+
 export async function subscribeToPush(groupId) {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
     console.warn('Push не поддерживается');
@@ -21,14 +25,12 @@ export async function subscribeToPush(groupId) {
   }
 
   let permission = Notification.permission;
-  console.log('Текущее разрешение уведомлений:', permission);
   if (permission === 'denied') {
     alert('Уведомления заблокированы. Разрешите их в настройках браузера для этого сайта.');
     return false;
   }
   if (permission === 'default') {
     permission = await Notification.requestPermission();
-    console.log('Запросили разрешение, результат:', permission);
     if (permission !== 'granted') return false;
   }
 
@@ -40,17 +42,10 @@ export async function subscribeToPush(groupId) {
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
       });
-      console.log('Создана новая push-подписка:', subscription);
-    } else {
-      console.log('Используем существующую подписку:', subscription);
     }
 
-    // Отправляем подписку на сервер (прокси)
-    const apiBase = import.meta.env.PROD 
-    ? '/api/save-subscription' 
-    : 'http://localhost:3000';
-
-    const response = await fetch(`${apiBase}/api/save-subscription`, {
+    // ✅ БАГ #2 ИСПРАВЛЕН: путь не дублируется
+    const response = await fetch(`${getApiBase()}/api/save-subscription`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ groupId, subscription })
@@ -61,7 +56,7 @@ export async function subscribeToPush(groupId) {
       return false;
     }
 
-    console.log('Подписка успешно сохранена на сервере');
+    console.log('Подписка успешно сохранена');
     return true;
   } catch (error) {
     console.error('Ошибка в subscribeToPush:', error);
@@ -75,15 +70,14 @@ export async function unsubscribeFromPush(groupId) {
   const subscription = await registration.pushManager.getSubscription();
   if (subscription) {
     await subscription.unsubscribe();
-    console.log('Отписка от push в браузере выполнена');
-    await fetch('http://localhost:3000/api/unsubscribe', {
+    // ✅ БАГ #3 ИСПРАВЛЕН: используем getApiBase() вместо localhost хардкода
+    await fetch(`${getApiBase()}/api/unsubscribe`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ groupId, endpoint: subscription.endpoint })
     });
-    console.log('Подписка удалена на сервере');
   }
-  return false; // теперь подписка не активна
+  return false;
 }
 
 export async function getPushSubscriptionStatus() {

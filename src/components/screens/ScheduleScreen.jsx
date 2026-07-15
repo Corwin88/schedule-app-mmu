@@ -172,8 +172,8 @@ export default function ScheduleScreen({ group, externalActiveDay, onDayChange, 
   const [error, setError] = useState(null)
   const [dates, setDates] = useState([])
 
-  const now = useMemo(() => new Date(), [])
-  const currentTimeMins = now.getHours() * 60 + now.getMinutes()
+  // ✅ БАГ #5 ИСПРАВЛЕН: вычисляем текущее время при каждом рендере
+  const currentTimeMins = new Date().getHours() * 60 + new Date().getMinutes()
 
   const prevViewMode = useRef(viewMode)
   useEffect(() => {
@@ -282,7 +282,8 @@ export default function ScheduleScreen({ group, externalActiveDay, onDayChange, 
       setActiveDay(externalActiveDay)
       if (onDayChange) onDayChange()
     }
-  }, [externalActiveDay])
+  // ✅ БАГ #7 ИСПРАВЛЕН: добавлена зависимость onDayChange
+  }, [externalActiveDay, onDayChange])
 
   const goToPrevWeek = () => setWeekOffset(prev => prev - 1)
   const goToNextWeek = () => setWeekOffset(prev => prev + 1)

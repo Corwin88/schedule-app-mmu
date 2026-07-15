@@ -23,15 +23,17 @@ async function fetchRemote(url, method = 'GET', body = null) {
     headers: { Authorization: AUTH_HEADER, 'Content-Type': 'application/json' },
   };
   if (body) options.body = JSON.stringify(body);
-  const response = await fetch(url, options);
-  const text = await response.text();
-  if (!response.ok) {
-    let error;
-    try { error = JSON.parse(text); } catch { error = { error: `Upstream ${response.status}` }; }
-    return { status: response.status, body: error };
+  try {
+    const response = await fetch(url, options);
+    const text = await response.text();
+    if (!response.ok) {
+      return { status: response.status, body: { error: `Upstream ${response.status}`, details: text } };
+    }
+    try { return { status: response.status, body: JSON.parse(text) }; }
+    catch { return { status: response.status, body: text }; }
+  } catch (err) {
+    return { status: 502, body: { error: 'Failed to reach upstream', details: err.message } };
   }
-  try { return { status: response.status, body: JSON.parse(text) }; }
-  catch { return { status: response.status, body: text }; }
 }
 
 function corsHeaders() {
@@ -48,7 +50,8 @@ export default async function handler(req) {
   }
 
   const url = new URL(req.url);
-  const path = url.pathname.replace('/api', '');
+  // ✅ БАГ #1 ИСПРАВЛЕН: используем pathname + search, не req.url
+  const path = url.pathname.replace(/^\/api/, '');
 
   try {
     // --- save-subscription ---
@@ -94,14 +97,12 @@ export default async function handler(req) {
       if (!title || !body) {
         return new Response(JSON.stringify({ error: 'Укажите title и body' }), { status: 400, headers: corsHeaders() });
       }
-
       const payload = JSON.stringify({
         title,
         body: fileUrl ? `${body}\n\n📎 Файл: ${fileUrl}` : body,
         icon: '/icon-192.png',
         data: { url: fileUrl || '/' },
       });
-
       let targets = [];
       if (!groupIds || groupIds === 'all') {
         const allKeys = await redis.keys('sub:*');
@@ -118,7 +119,6 @@ export default async function handler(req) {
           }
         }
       }
-
       let success = 0;
       for (const sub of targets) {
         try {
@@ -140,13 +140,20 @@ export default async function handler(req) {
       return new Response(JSON.stringify({ error: 'Загрузка файлов временно недоступна' }), { status: 501, headers: corsHeaders() });
     }
 
-    // --- proxy all other /api/* ---
-    const targetUrl = `https://schedule.mi.university${req.url.replace('/api', '')}`;
-    const { status, body } = await fetchRemote(targetUrl, req.method, req.method !== 'GET' ? await req.json() : null);
+    // ✅ БАГ #1 ИСПРАВЛЕН: передаём полный pathname + search, не трогаем req.url
+    const targetUrl = `https://schedule.mi.university${url.pathname}${url.search}`;
+    const { status, body } = await fetchRemote(
+      targetUrl,
+      req.method,
+      req.method !== 'GET' ? await req.json() : null
+    );
     return new Response(JSON.stringify(body), { status, headers: corsHeaders() });
 
   } catch (error) {
     console.error('Function error:', error);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), { status: 500, headers: corsHeaders() });
+    return new Response(
+      JSON.stringify({ error: 'Internal server error', details: error.message }),
+      { status: 500, headers: corsHeaders() }
+    );
   }
 }

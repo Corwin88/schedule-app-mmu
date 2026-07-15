@@ -10,6 +10,11 @@ export default function GroupModal({ isOpen, currentGroupId, currentGroupName, o
 
   useEffect(() => {
     if (!isOpen) return
+    // ✅ БАГ #8 ИСПРАВЛЕН: сбрасываем фильтры при каждом открытии
+    setQuery('')
+    setCourseFilter(0)
+    setLoading(true)
+    setError(null)
     fetchGroups()
       .then(data => {
         setAllGroups(data)
