@@ -1,21 +1,31 @@
 import { useState, useEffect } from 'react'
 
 export default function InstallPrompt() {
+  const [visible, setVisible] = useState(false)
   const [deferredPrompt, setDeferredPrompt] = useState(null)
-  const [showPrompt, setShowPrompt] = useState(false)
+  const [isIOS, setIsIOS] = useState(false)
 
   useEffect(() => {
+    // Проверяем, не закрывал ли пользователь баннер ранее
+    if (localStorage.getItem('welcome_banner_dismissed') === 'true') {
+      return
+    }
+
+    // Определяем iOS
+    const ua = navigator.userAgent || ''
+    if (/iPhone|iPad|iPod/.test(ua)) {
+      setIsIOS(true)
+    }
+
+    // Слушаем beforeinstallprompt для Android
     const handler = (e) => {
       e.preventDefault()
       setDeferredPrompt(e)
-      // Показываем окно, если не показывали ранее (можно управлять через localStorage)
-      const alreadyShown = localStorage.getItem('install_prompt_shown') === 'true'
-      if (!alreadyShown) {
-        setShowPrompt(true)
-        localStorage.setItem('install_prompt_shown', 'true')
-      }
     }
     window.addEventListener('beforeinstallprompt', handler)
+
+    setVisible(true)
+
     return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
 
@@ -25,60 +35,78 @@ export default function InstallPrompt() {
     const { outcome } = await deferredPrompt.userChoice
     console.log('Результат установки:', outcome)
     setDeferredPrompt(null)
-    setShowPrompt(false)
   }
 
-  if (!showPrompt) return null
+  const handleDismiss = () => {
+    localStorage.setItem('welcome_banner_dismissed', 'true')
+    setVisible(false)
+  }
+
+  if (!visible) return null
 
   return (
     <div style={{
-      position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)',
-      background: 'var(--bg-card, #fff)',
-      borderRadius: '16px',
-      padding: '16px 20px',
-      boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
-      display: 'flex', alignItems: 'center', gap: '12px',
-      zIndex: 500,
-      maxWidth: '400px', width: 'calc(100% - 32px)'
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 1000,
+      background: 'var(--bg-card)',
+      borderBottom: '1px solid var(--grey)',
+      padding: '12px 16px',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+      fontSize: '14px',
+      color: 'var(--text-primary)',
     }}>
-      <i className="ti ti-download" style={{ fontSize: '24px', color: 'var(--accent)' }} />
-      <div style={{ flex: 1 }}>
-        <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)' }}>
-          Установить приложение
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ marginBottom: 8 }}>
+            ⚠️ Приложение находится в разработке, возможны ошибки.
+          </div>
+
+          {isIOS ? (
+            <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+              📱 Чтобы установить на iPhone/iPad:<br />
+              Нажмите <strong>«Поделиться»</strong> (квадрат со стрелкой в Safari) и выберите <strong>«На экран „Домой“»</strong>.
+            </div>
+          ) : deferredPrompt ? (
+            <button
+              onClick={handleInstall}
+              style={{
+                background: 'var(--accent)',
+                color: 'var(--white)',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '6px 14px',
+                fontSize: '14px',
+                fontWeight: 500,
+                cursor: 'pointer',
+              }}
+            >
+              📲 Установить приложение
+            </button>
+          ) : (
+            <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+              📱 Чтобы установить на Android, откройте меню браузера и выберите <strong>«Установить приложение»</strong> или <strong>«Добавить на главный экран»</strong>.
+            </div>
+          )}
         </div>
-        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-          Быстрый доступ с главного экрана
-        </div>
+
+        <button
+          onClick={handleDismiss}
+          style={{
+            background: 'none',
+            border: 'none',
+            fontSize: '18px',
+            cursor: 'pointer',
+            color: 'var(--text-muted)',
+            marginLeft: '8px',
+          }}
+          aria-label="Закрыть"
+        >
+          ✕
+        </button>
       </div>
-      <button
-        onClick={handleInstall}
-        style={{
-          background: 'var(--accent)',
-          color: '#fff',
-          border: 'none',
-          borderRadius: '10px',
-          padding: '8px 16px',
-          fontSize: '14px',
-          fontWeight: 500,
-          cursor: 'pointer',
-          whiteSpace: 'nowrap'
-        }}
-      >
-        Установить
-      </button>
-      <button
-        onClick={() => setShowPrompt(false)}
-        style={{
-          background: 'transparent',
-          border: 'none',
-          color: 'var(--text-muted)',
-          fontSize: '18px',
-          cursor: 'pointer',
-          marginLeft: '-8px'
-        }}
-      >
-        ×
-      </button>
     </div>
   )
 }
