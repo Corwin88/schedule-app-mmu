@@ -176,6 +176,7 @@ export default function ScheduleScreen({ group, externalActiveDay, onDayChange, 
   const currentTimeMins = new Date().getHours() * 60 + new Date().getMinutes()
 
   const prevViewMode = useRef(viewMode)
+  const comingFromMonth = useRef(false)
   useEffect(() => {
     prevViewMode.current = viewMode
   }, [viewMode])
@@ -213,11 +214,10 @@ export default function ScheduleScreen({ group, externalActiveDay, onDayChange, 
     const { weekDates, dateFrom, dateTo } = getWeekRange(weekOffset)
     setDates(weekDates)
 
-    if (prevViewMode.current === 'month') {
-      // activeDay уже установлен в handleDayClick
-    } else {
+    if (!comingFromMonth.current) {
       setActiveDay(weekOffset === 0 ? todayIndex : 0)
-    }
+      }
+      comingFromMonth.current = false
 
     fetchSchedule(group.id, dateFrom, dateTo)
       .then(data => {
@@ -397,6 +397,7 @@ export default function ScheduleScreen({ group, externalActiveDay, onDayChange, 
     const daysInWeek = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
 
     const handleDayClick = (dayNumber, dayIndexFromGrid) => {
+      comingFromMonth.current = true
       const clickedDate = new Date(year, month, dayNumber)
       const dayOfWeek = clickedDate.getDay()
       const mondayOfThatWeek = new Date(clickedDate)
