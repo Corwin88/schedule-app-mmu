@@ -46,9 +46,11 @@ html, body, #root {
 /* Шапка */
 .header {
   background: var(--bg-header);
-  padding: 18px 18px 16px;
+  padding: 16px 16px 12px;
+  padding-top: calc(16px + env(safe-area-inset-top, 0px)); /* учитываем статус-бар */
   flex-shrink: 0;
 }
+
 .header-top {
   display: flex;
   justify-content: space-between;
@@ -251,4 +253,49 @@ html, body, #root {
 }
 .week-nav-today:hover {
   background: rgba(255, 255, 255, 0.25);
+}
+/* Адаптация под маленькие экраны (мобильные) */
+@media (max-width: 480px) {
+  .header {
+    padding: 12px 12px 8px;
+    padding-top: calc(12px + env(safe-area-inset-top, 0px));
+  }
+
+  .header-title {
+    font-size: 16px;       /* было 18px */
+  }
+
+  .header-sub {
+    font-size: 10px;       /* было 11px */
+  }
+
+  .week-nav-btn,
+  .week-nav-today {
+    padding: 4px 8px;      /* чуть компактнее */
+    font-size: 14px;
+  }
+
+  .days-strip {
+    gap: 2px;
+    padding: 6px 8px;
+  }
+
+  .day-pill {
+    padding: 6px 2px;
+  }
+
+  .day-pill .dd {
+    font-size: 16px;       /* уменьшим даты */
+  }
+
+  .day-pill .dn {
+    font-size: 9px;
+  }
+
+  /* Виджет следующей пары тоже можно слегка сжать */
+  .next-class-widget {
+    margin: 6px 8px;
+    padding: 8px 10px;
+    font-size: 13px;
+  }
 }
