@@ -1,1 +1,6 @@
-# Пустой конфиг, чтобы пропустить авто-деплой
+name = "schedule-app-mmu"
+compatibility_date = "2026-07-16"
+main = "./functions/api/proxy.js"
+
+[assets]
+directory = "./dist"
