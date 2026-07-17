@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Админ-панель уведомлений — ММУ</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f3f4f6;
+      color: #1f2937;
+      display: flex;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+    .container {
+      max-width: 1200px;
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 2rem;
+    }
+    @media (max-width: 900px) {
+      .container { grid-template-columns: 1fr; }
+      .preview-column { order: -1; }
+    }
+    .form-column {
+      background: white;
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+    .preview-column {
+      background: white;
+      border-radius: 16px;
+      padding: 1rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      height: fit-content;
+      position: sticky;
+      top: 1rem;
+    }
+    h2 { font-size: 1.5rem; margin-bottom: 1rem; }
+    label { display: block; font-weight: 600; margin: 0.8rem 0 0.3rem; }
+    input, select, textarea {
+      width: 100%;
+      padding: 0.6rem;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 0.9rem;
+    }
+    textarea { resize: vertical; }
+    .toolbar { display: flex; gap: 6px; margin: 0.3rem 0; }
+    .toolbar button {
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      background: #e5e7eb;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .toolbar button:hover { background: #d1d5db; }
+    .file-section { margin-top: 0.8rem; }
+    .filter-row { display: flex; flex-wrap: wrap; gap: 0.8rem; margin: 0.8rem 0; }
+    .filter-row > div { flex: 1; min-width: 150px; }
+    .group-container {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      max-height: 280px;
+      overflow-y: auto;
+      padding: 0.5rem;
+      background: #fafafa;
+    }
+    .group-item { display: flex; align-items: center; font-size: 0.9rem; margin: 0.2rem 0; }
+    .group-item input[type="checkbox"] { width: auto; margin-right: 0.5rem; }
+    .action-buttons { display: flex; gap: 8px; margin: 0.5rem 0; }
+    .action-buttons button {
+      background: #6b7280;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+    .action-buttons button:hover { background: #4b5563; }
+    .tag-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 0.8rem 0; }
+    .tag {
+      background: #e0e7ff;
+      color: #3730a3;
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      display: flex;
+      align-items: center;
+    }
+    .tag button { background: none; border: none; color: inherit; margin-left: 6px; cursor: pointer; font-weight: bold; }
+    .send-btn {
+      background: #4f46e5;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 24px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 1rem;
+    }
+    .send-btn:hover { background: #4338ca; }
+    #status { margin-top: 0.8rem; font-weight: 500; }
+    .preview-phone {
+      background: #111827;
+      border-radius: 24px;
+      padding: 12px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+    }
+    .preview-screen {
+      background: white;
+      border-radius: 16px;
+      padding: 12px;
+      min-height: 200px;
+      font-size: 0.9rem;
+    }
+    .preview-header { font-weight: 600; margin-bottom: 8px; }
+    .preview-body { line-height: 1.4; }
+    .preview-body a { color: #4f46e5; }
+    .template-section, .list-section { margin-top: 1rem; }
+    .template-section select, .list-section select { width: 100%; padding: 0.5rem; border-radius: 6px; border: 1px solid #d1d5db; margin-top: 0.2rem; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <!-- Левая колонка: форма -->
+  <div class="form-column">
+    <h2>📢 Новая рассылка</h2>
+    <label>Заголовок</label>
+    <input type="text" id="title" placeholder="Важное объявление" required>
+
+    <label>Сообщение</label>
+    <div class="toolbar">
+      <button onclick="format('bold')"><b>B</b></button>
+      <button onclick="format('italic')"><i>I</i></button>
+      <button onclick="smartLink()">🔗 Ссылка</button>
+    </div>
+    <textarea id="body" rows="4" placeholder="Введите текст уведомления..."></textarea>
+
+    <div class="file-section">
+      <label>Прикрепить файл (необязательно)</label>
+      <input type="file" id="fileInput">
+      <progress id="uploadProgress" value="0" max="100" style="display:none; width:100%; margin-top:4px;"></progress>
+      <div id="fileStatus" style="font-size:0.8rem; margin-top:2px;"></div>
+    </div>
+
+    <div style="margin-top:1.2rem;">
+      <label style="font-weight:600;">Получатели</label>
+      <div style="margin:0.3rem 0;">
+        <label><input type="radio" name="targetType" value="all" onchange="toggleGroupSelection()"> Всем группам</label>
+        <label style="margin-left:1rem;"><input type="radio" name="targetType" value="selected" checked onchange="toggleGroupSelection()"> Выбрать группы</label>
+      </div>
+      <div id="groupSelection">
+        <div class="filter-row">
+          <div><label>Поиск</label><input type="text" id="searchGroup" placeholder="Название или специальность" oninput="renderGroups()"></div>
+          <div><label>Курс</label><select id="filterCourse" onchange="renderGroups()"><option value="">Все</option></select></div>
+          <div><label>Направление</label><input type="text" id="filterSpeciality" placeholder="Специальность" oninput="renderGroups()"></div>
+          <div><label>Форма обучения</label><select id="filterForm" onchange="renderGroups()"><option value="">Все</option></select></div>
+        </div>
+        <div class="action-buttons">
+          <button onclick="selectAll()">Выбрать всех</button>
+          <button onclick="deselectAll()">Снять выбор</button>
+          <button onclick="saveGroupSet()">💾 Сохранить набор</button>
+        </div>
+        <!-- Фильтр "только с подписками" -->
+        <div style="margin: 8px 0;">
+          <label style="display: flex; align-items: center; font-weight: normal; cursor: pointer;">
+            <input type="checkbox" id="showOnlySubscribed" onchange="renderGroups()" style="width: auto; margin-right: 8px;">
+            Показывать только группы с подписками
+          </label>
+        </div>
+        <div class="group-container" id="groupContainer">Загрузка...</div>
+        <div class="tag-list" id="selectedTags"></div>
+
+        <!-- Сохранённые наборы -->
+        <div class="list-section">
+          <label>Загрузить сохранённый набор</label>
+          <select id="savedSets" onchange="loadGroupSet(this.value)"><option value="">-- Не выбрано --</option></select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Шаблоны сообщений -->
+    <div class="template-section">
+      <label>Шаблоны сообщений</label>
+      <select id="templateSelect" onchange="loadTemplate(this.value)">
+        <option value="">-- Не выбрано --</option>
+      </select>
+      <button style="margin-top:6px;" onclick="saveTemplate()">💾 Сохранить как шаблон</button>
+    </div>
+
+    <button class="send-btn" onclick="sendNotification()">📨 Отправить уведомление</button>
+    <div id="status"></div>
+  </div>
+
+  <!-- Правая колонка: предпросмотр -->
+  <div class="preview-column">
+    <h3 style="margin-bottom:0.5rem;">📱 Предпросмотр</h3>
+    <div class="preview-phone">
+      <div class="preview-screen">
+        <div class="preview-header" id="previewTitle">Заголовок</div>
+        <div class="preview-body" id="previewBody">Сообщение</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ==================== Глобальные переменные ====================
+  let allGroups = [];
+  let subscriptionsStats = {};   // { groupOid: count }
+  let selectedFileUrl = null;    // ссылка на загруженный файл
+  const secret = localStorage.getItem('adminSecret') || prompt('Введите секретный ключ администратора:');
+  if (secret) localStorage.setItem('adminSecret', secret);
+
+  // ==================== Загрузка групп ====================
+  async function loadGroups() {
+    try {
+      const res = await fetch('http://api/dictionary/groups');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      allGroups = await res.json();
+    } catch (e) {
+      console.warn('Не удалось загрузить реальные группы, используем резервный список');
+      // Резервные группы
+      allGroups = [
+        { groupOid: 29, name: "АДТ212-1", course: 4, formOfEducation: "очная", speciality: "52.05.01 Актерское искусство" },
+        { groupOid: 182, name: "ММО511-1", course: 1, formOfEducation: "очная", speciality: "38.03.05 Бизнес-информатика" },
+        { groupOid: 378, name: "ФМЛ311-2", course: 3, formOfEducation: "очная", speciality: "45.03.01 Филология" }
+      ];
+    }
+
+    // Загружаем статистику подписок
+    try {
+      const statsRes = await fetch('http://api/subscriptions-stats');
+      if (statsRes.ok) {
+        subscriptionsStats = await statsRes.json();
+      } else {
+        subscriptionsStats = {};
+      }
+    } catch (err) {
+      subscriptionsStats = {};
+    }
+
+    populateFilters();
+    renderGroups();
+    loadSavedSets();
+    loadTemplates();
+  }
+
+  function populateFilters() {
+    const courses = [...new Set(allGroups.map(g => g.course))].filter(Boolean).sort((a,b)=>a-b);
+    const forms = [...new Set(allGroups.map(g => g.formOfEducation).filter(Boolean))].sort();
+    document.getElementById('filterCourse').innerHTML = '<option value="">Все</option>' + courses.map(c => `<option value="${c}">${c} курс</option>`).join('');
+    document.getElementById('filterForm').innerHTML = '<option value="">Все</option>' + forms.map(f => `<option value="${f}">${f}</option>`).join('');
+  }
+
+  function renderGroups() {
+    const search = document.getElementById('searchGroup').value.trim().toLowerCase();
+    const course = document.getElementById('filterCourse').value;
+    const speciality = document.getElementById('filterSpeciality').value.trim().toLowerCase();
+    const form = document.getElementById('filterForm').value;
+    const onlySubscribed = document.getElementById('showOnlySubscribed')?.checked || false;
+
+    let filtered = allGroups.filter(g => {
+      return (!search || g.name.toLowerCase().includes(search) || (g.speciality && g.speciality.toLowerCase().includes(search)))
+        && (!course || g.course == course)
+        && (!speciality || (g.speciality && g.speciality.toLowerCase().includes(speciality)))
+        && (!form || g.formOfEducation === form);
+    });
+
+    if (onlySubscribed) {
+      filtered = filtered.filter(g => (subscriptionsStats[g.groupOid] || 0) > 0);
+    }
+
+    const container = document.getElementById('groupContainer');
+    container.innerHTML = filtered.map(g => {
+      const subCount = subscriptionsStats[g.groupOid] || 0;
+      const subText = subCount > 0 ? ` (${subCount} подписок)` : ' (0 подписок)';
+      return `
+        <div class="group-item">
+          <input type="checkbox" value="${g.groupOid}" id="g_${g.groupOid}" onchange="updateTags()">
+          <label for="g_${g.groupOid}">${g.name} (${g.course} курс, ${g.formOfEducation}, ${g.speciality || ''}) <span style="color:#4f46e5;font-weight:500;">${subText}</span></label>
+        </div>
+      `;
+    }).join('');
+    updateTags();
+  }
+
+  // ==================== Теги выбранных групп ====================
+  function updateTags() {
+    const checked = document.querySelectorAll('#groupContainer input[type=checkbox]:checked');
+    const tagContainer = document.getElementById('selectedTags');
+    tagContainer.innerHTML = Array.from(checked).map(cb => {
+      const group = allGroups.find(g => g.groupOid == cb.value);
+      const name = group ? group.name : cb.value;
+      return `<span class="tag">${name} <button onclick="removeGroup('${cb.value}')">×</button></span>`;
+    }).join('');
+  }
+
+  window.removeGroup = function(groupOid) {
+    const cb = document.getElementById(`g_${groupOid}`);
+    if (cb) cb.checked = false;
+    updateTags();
+  };
+
+  window.selectAll = function() {
+    document.querySelectorAll('#groupContainer input[type=checkbox]').forEach(cb => cb.checked = true);
+    updateTags();
+  };
+  window.deselectAll = function() {
+    document.querySelectorAll('#groupContainer input[type=checkbox]').forEach(cb => cb.checked = false);
+    updateTags();
+  };
+
+  function toggleGroupSelection() {
+    const type = document.querySelector('input[name="targetType"]:checked').value;
+    document.getElementById('groupSelection').style.display = type === 'all' ? 'none' : 'block';
+  }
+
+  // ==================== Умная вставка ссылки ====================
+  async function smartLink() {
+    const ta = document.getElementById('body');
+    const start = ta.selectionStart, end = ta.selectionEnd;
+    const selectedText = ta.value.substring(start, end);
+    let url = '';
+    try {
+      const clipText = await navigator.clipboard.readText();
+      if (clipText && (clipText.startsWith('http://') || clipText.startsWith('https://'))) {
+        url = clipText;
+      }
+    } catch (e) {}
+    if (!url) url = prompt('Введите URL ссылки:', 'https://');
+    if (!url) return;
+    const text = selectedText || prompt('Текст ссылки:', url) || url;
+    ta.setRangeText(`[${text}](${url})`, start, end, 'end');
+    ta.focus();
+  }
+
+  function format(type) {
+    const ta = document.getElementById('body');
+    const start = ta.selectionStart, end = ta.selectionEnd;
+    const text = ta.value.substring(start, end);
+    let replacement = '';
+    if (type === 'bold') replacement = `**${text}**`;
+    else if (type === 'italic') replacement = `*${text}*`;
+    ta.setRangeText(replacement, start, end, 'select');
+    ta.focus();
+  }
+
+  // ==================== Предпросмотр (Markdown → HTML) ====================
+  function updatePreview() {
+    let title = document.getElementById('title').value || 'Без заголовка';
+    let body = document.getElementById('body').value || '';
+    body = body.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+    body = body.replace(/\*(.+?)\*/g, '<i>$1</i>');
+    body = body.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank">$1</a>');
+    body = body.replace(/\n/g, '<br>');
+    document.getElementById('previewTitle').innerHTML = title;
+    document.getElementById('previewBody').innerHTML = body;
+  }
+
+  document.getElementById('title').addEventListener('input', updatePreview);
+  document.getElementById('body').addEventListener('input', updatePreview);
+
+  // ==================== Сохранение / загрузка наборов групп ====================
+  function getGroupSetKey() { return 'mmu_admin_groupsets'; }
+  function loadSavedSets() {
+    const select = document.getElementById('savedSets');
+    const raw = localStorage.getItem(getGroupSetKey());
+    const sets = raw ? JSON.parse(raw) : [];
+    select.innerHTML = '<option value="">-- Не выбрано --</option>' + sets.map((s, idx) => `<option value="${idx}">${s.name} (${s.ids.length} гр.)</option>`).join('');
+  }
+  function saveGroupSet() {
+    const checked = document.querySelectorAll('#groupContainer input[type=checkbox]:checked');
+    const ids = Array.from(checked).map(cb => cb.value);
+    if (ids.length === 0) { alert('Выберите хотя бы одну группу'); return; }
+    const name = prompt('Название набора:', `Набор ${new Date().toLocaleDateString()}`);
+    if (!name) return;
+    const raw = localStorage.getItem(getGroupSetKey());
+    const sets = raw ? JSON.parse(raw) : [];
+    sets.push({ name, ids });
+    localStorage.setItem(getGroupSetKey(), JSON.stringify(sets));
+    loadSavedSets();
+  }
+  window.loadGroupSet = function(idx) {
+    if (idx === '') return;
+    const raw = localStorage.getItem(getGroupSetKey());
+    const sets = JSON.parse(raw);
+    const set = sets[parseInt(idx)];
+    if (!set) return;
+    document.querySelectorAll('#groupContainer input[type=checkbox]').forEach(cb => cb.checked = false);
+    set.ids.forEach(id => {
+      const cb = document.getElementById(`g_${id}`);
+      if (cb) cb.checked = true;
+    });
+    updateTags();
+  };
+
+  // ==================== Шаблоны сообщений ====================
+  function getTemplateKey() { return 'mmu_admin_templates'; }
+  function loadTemplates() {
+    const select = document.getElementById('templateSelect');
+    const raw = localStorage.getItem(getTemplateKey());
+    const temps = raw ? JSON.parse(raw) : [];
+    select.innerHTML = '<option value="">-- Не выбрано --</option>' + temps.map((t, idx) => `<option value="${idx}">${t.title}</option>`).join('');
+  }
+  window.loadTemplate = function(idx) {
+    if (idx === '') return;
+    const raw = localStorage.getItem(getTemplateKey());
+    const temps = JSON.parse(raw);
+    const t = temps[parseInt(idx)];
+    if (!t) return;
+    document.getElementById('title').value = t.title;
+    document.getElementById('body').value = t.body;
+    updatePreview();
+  };
+  window.saveTemplate = function() {
+    const title = document.getElementById('title').value.trim();
+    const body = document.getElementById('body').value.trim();
+    if (!title || !body) { alert('Заполните заголовок и сообщение'); return; }
+    const raw = localStorage.getItem(getTemplateKey());
+    const temps = raw ? JSON.parse(raw) : [];
+    temps.push({ title, body });
+    localStorage.setItem(getTemplateKey(), JSON.stringify(temps));
+    loadTemplates();
+    alert('Шаблон сохранён');
+  };
+
+  // ==================== Загрузка файла ====================
+  document.getElementById('fileInput').addEventListener('change', async function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    const progress = document.getElementById('uploadProgress');
+    progress.style.display = 'block';
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.upload.addEventListener('progress', (ev) => {
+        if (ev.lengthComputable) progress.value = (ev.loaded / ev.total) * 100;
+      });
+      xhr.open('POST', 'http://api/upload');
+      xhr.send(formData);
+      xhr.onload = () => {
+        progress.style.display = 'none';
+        if (xhr.status === 200) {
+          const res = JSON.parse(xhr.responseText);
+          selectedFileUrl = res.fileUrl;   // <-- сохраняем ссылку
+          document.getElementById('fileStatus').innerText = '✅ Файл загружен: ' + selectedFileUrl;
+        } else {
+          alert('Ошибка загрузки файла');
+        }
+      };
+    } catch (err) {
+      alert('Ошибка: ' + err.message);
+    }
+  });
+
+  // ==================== Отправка уведомления ====================
+  async function sendNotification() {
+    if (!secret) { alert('Секретный ключ не задан'); return; }
+    const title = document.getElementById('title').value.trim();
+    const body = document.getElementById('body').value.trim();
+    if (!title || !body) { alert('Заполните заголовок и сообщение'); return; }
+
+    let groupIds = [];
+    const targetType = document.querySelector('input[name="targetType"]:checked').value;
+    if (targetType === 'selected') {
+      const checked = document.querySelectorAll('#groupContainer input[type=checkbox]:checked');
+      groupIds = Array.from(checked).map(cb => cb.value);
+      if (groupIds.length === 0) { alert('Выберите хотя бы одну группу'); return; }
+    } else {
+      groupIds = 'all';
+    }
+
+    const statusDiv = document.getElementById('status');
+    statusDiv.innerText = '⏳ Отправка...';
+
+    try {
+      const res = await fetch('http://api/send-notification', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + secret
+        },
+        body: JSON.stringify({
+          title,
+          body,
+          groupIds,
+          fileUrl: selectedFileUrl || undefined   // передаём файл, если есть
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        statusDiv.innerText = `✅ Успешно доставлено ${data.sent} из ${data.total} подписок.`;
+        selectedFileUrl = null;
+        document.getElementById('fileInput').value = '';
+        document.getElementById('fileStatus').innerText = '';
+      } else {
+        statusDiv.innerText = '❌ Ошибка: ' + data.error;
+      }
+    } catch (err) {
+      statusDiv.innerText = '❌ Сетевая ошибка: ' + err.message;
+    }
+  }
+
+  // ==================== Старт ====================
+  loadGroups();
+  toggleGroupSelection();
+  updatePreview();
+</script>
+</body>
+</html>
