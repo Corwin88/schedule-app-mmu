@@ -39,21 +39,28 @@ async function fetchRemote(url, method, body, authHeader) {
 async function handleApi(request, env, url) {
   const path = url.pathname.replace(/^\/api/, '');
 
-  const AUTH_HEADER = 'Basic ' + btoa(`${env.RUIZ_USER}:${env.RUIZ_PASS}`);
+  const AUTH_HEADER = 'Basic ' + btoa(`${env.RUIZ_USER || ''}:${env.RUIZ_PASS || ''}`);
 
-  const redis = new Redis({
-    url: env.UPSTASH_REDIS_REST_URL,
-    token: env.UPSTASH_REDIS_REST_TOKEN,
-  });
+  // ✅ Ленивая инициализация — создаём только когда реально нужны,
+  // чтобы простой запрос расписания не падал из-за отсутствия push-переменных
+  function getRedis() {
+    return new Redis({
+      url: env.UPSTASH_REDIS_REST_URL,
+      token: env.UPSTASH_REDIS_REST_TOKEN,
+    });
+  }
 
-  webpush.setVapidDetails(
-    'mailto:example@mail.ru',
-    env.VAPID_PUBLIC_KEY,
-    env.VAPID_PRIVATE_KEY
-  );
+  function initWebpush() {
+    webpush.setVapidDetails(
+      'mailto:example@mail.ru',
+      env.VAPID_PUBLIC_KEY,
+      env.VAPID_PRIVATE_KEY
+    );
+  }
 
   // --- save-subscription ---
   if (request.method === 'POST' && path === '/save-subscription') {
+    const redis = getRedis();
     const { groupId, subscription } = await request.json();
     if (!groupId || !subscription) return jsonResponse({ error: 'Нет данных' }, 400);
     const key = `sub:${groupId}:${subscription.endpoint}`;
@@ -63,6 +70,7 @@ async function handleApi(request, env, url) {
 
   // --- unsubscribe ---
   if (request.method === 'POST' && path === '/unsubscribe') {
+    const redis = getRedis();
     const { groupId, endpoint } = await request.json();
     if (!groupId || !endpoint) return jsonResponse({ error: 'Нет данных' }, 400);
     const key = `sub:${groupId}:${endpoint}`;
@@ -72,6 +80,7 @@ async function handleApi(request, env, url) {
 
   // --- subscriptions-stats ---
   if (request.method === 'GET' && path === '/subscriptions-stats') {
+    const redis = getRedis();
     const keys = await redis.keys('sub:*');
     const stats = {};
     for (const key of keys) {
@@ -83,6 +92,8 @@ async function handleApi(request, env, url) {
 
   // --- send-notification ---
   if (request.method === 'POST' && path === '/send-notification') {
+    const redis = getRedis();
+    initWebpush();
     const authHeader = request.headers.get('authorization');
     if (!authHeader || authHeader !== `Bearer ${env.ADMIN_SECRET}`) {
       return jsonResponse({ error: 'Неверный секретный ключ' }, 403);
@@ -155,7 +166,9 @@ export default {
       try {
         return await handleApi(request, env, url);
       } catch (error) {
-        return jsonResponse({ error: 'Internal server error', details: error.message }, 500);
+        // ✅ Временно выводим стек ошибки для отладки — потом можно убрать details
+        console.error('API error:', error);
+        return jsonResponse({ error: 'Internal server error', details: error.message, stack: error.stack }, 500);
       }
     }
 
